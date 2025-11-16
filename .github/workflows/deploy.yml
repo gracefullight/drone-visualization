@@ -1,8 +1,8 @@
-name: Deploy to GitHub Pages
+name: Deploy Next.js static export to GitHub Pages
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -10,9 +10,14 @@ permissions:
   pages: write
   id-token: write
 
+# Allow only one active deployment; cancel outdated queued runs to save minutes.
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+  CI: true
 
 jobs:
   build:
@@ -30,20 +35,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: pnpm
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**/*.[jt]sx', '**/*.[jt]s') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint (Biome)
+        run: pnpm run lint || true
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Build
+      - name: Build (static export)
         env:
-          NEXT_TELEMETRY_DISABLED: 1
-          # This env is available automatically on GitHub runners; used in next.config.ts
-          GITHUB_ACTIONS: true
+          GITHUB_ACTIONS: true # triggers basePath/assetPrefix in next.config.ts
         run: pnpm run build
+
+      - name: Verify export directory
+        run: test -d out && ls -1 out | head -n 20
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
