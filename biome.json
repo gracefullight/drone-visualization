@@ -20,6 +20,23 @@
       "recommended": true,
       "suspicious": {
         "noUnknownAtRules": "off"
+      },
+      "complexity": {
+        "noForEach": "warn",
+        "noStaticOnlyClass": "error",
+        "noUselessConstructor": "error",
+        "useFlatMap": "warn"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "useHookAtTopLevel": "error"
+      },
+      "style": {
+        "noNegationElse": "warn",
+        "useCollapsedElseIf": "warn",
+        "useConsistentArrayType": "error",
+        "useForOf": "warn"
       }
     },
     "domains": {
