@@ -38,7 +38,7 @@ export function Scene({ buildings, rfPoints, selectedMetric }: SceneProps) {
 
   return (
     <Canvas
-      camera={{ position: [0, 150, 150], fov: 50 }}
+      camera={{ position: [0, 250, 250], fov: 50 }}
       dpr={[1, 2]}
       gl={{ antialias: false, powerPreference: "high-performance" }}
     >
