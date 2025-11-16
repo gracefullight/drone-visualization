@@ -1,0 +1,11 @@
+# Example terraform.tfvars
+# Copy to terraform.tfvars and adjust values
+
+aws_region         = "ap-southeast-2"
+environment        = "production"
+project_name       = "drone-visualization"
+cors_allow_origins = "https://gracefullight.github.io,https://gracefullight.dev"
+waf_rate_limit     = 2000
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["ap-southeast-2a", "ap-southeast-2b"]
+enable_nat_gateway = false

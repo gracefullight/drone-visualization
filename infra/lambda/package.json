@@ -1,0 +1,17 @@
+{
+  "name": "drone-viz-lambda",
+  "version": "1.0.0",
+  "description": "RF data generation Lambda function",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["lambda", "rf", "drone"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}
