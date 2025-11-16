@@ -2,21 +2,13 @@
 
 import { useMemo } from "react";
 import { AdditiveBlending, Texture, Vector3 } from "three";
+import { rgbToHex } from "@/lib/constants/colors";
 import { getColorFromMetric, METRIC_RANGES } from "@/lib/constants/rf-metrics";
 import type { MetricType, RFPoint } from "@/types";
 
 interface SignalBlobsProps {
   rfPoints: RFPoint[];
   selectedMetric: MetricType;
-}
-
-// Helper to convert [0..1] rgb to hex string
-function rgbToHex([r, g, b]: [number, number, number]): string {
-  const to255 = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
-  const rr = to255(r).toString(16).padStart(2, "0");
-  const gg = to255(g).toString(16).padStart(2, "0");
-  const bb = to255(b).toString(16).padStart(2, "0");
-  return `#${rr}${gg}${bb}`;
 }
 
 export function SignalBlobs({ rfPoints, selectedMetric }: SignalBlobsProps) {
@@ -86,9 +78,9 @@ export function SignalBlobs({ rfPoints, selectedMetric }: SignalBlobsProps) {
         pos.multiplyScalar(1 / group.length);
         const avgMetric = sumMetric / group.length;
         const color = rgbToHex(getColorFromMetric(avgMetric, selectedMetric));
-        // Size bias: slightly larger blob when quality is poorer so red areas feel denser
+        // Size bias: larger blobs for better visibility
         const q = normalize(avgMetric);
-        const size = 2.6 + (1 - q) * 1.6; // 2.6m to 4.2m
+        const size = 4.0 + (1 - q) * 3.0; // 4.0m to 7.0m
         out.push({ position: [pos.x, pos.y, pos.z], color, size });
       }
     }
@@ -113,7 +105,7 @@ export function SignalBlobs({ rfPoints, selectedMetric }: SignalBlobsProps) {
             alphaMap={spriteMap}
             color={b.color}
             transparent
-            opacity={0.35}
+            opacity={0.55}
             depthWrite={false}
             depthTest={false}
             blending={AdditiveBlending}

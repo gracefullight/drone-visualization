@@ -130,3 +130,73 @@ export function generateAllRFPoints(buildings: BuildingData[]): RFPoint[] {
 
   return allPoints;
 }
+
+/**
+ * Generate indoor RF points in a grid pattern for a specific floor
+ * @param building - Building to generate points for
+ * @param floorIndex - Floor index (0-based)
+ * @param gridResolution - Number of points per axis (default: 8x8 grid)
+ * @returns Array of indoor RF points
+ */
+export function generateIndoorRFPoints(
+  building: BuildingData,
+  floorIndex: number,
+  gridResolution = 8,
+): RFPoint[] {
+  const points: RFPoint[] = [];
+  const [bx, by, bz] = building.position;
+  const { width, height, depth, floorCount } = building;
+
+  const floorHeight = height / floorCount;
+  const floorY = by - height / 2 + floorHeight * floorIndex + floorHeight / 2;
+
+  // Create grid of points inside the floor
+  // Leave some margin from walls
+  const margin = 0.5;
+  const gridWidth = width - margin * 2;
+  const gridDepth = depth - margin * 2;
+
+  for (let xi = 0; xi < gridResolution; xi++) {
+    for (let zi = 0; zi < gridResolution; zi++) {
+      const xRatio = xi / (gridResolution - 1);
+      const zRatio = zi / (gridResolution - 1);
+
+      const px = bx - gridWidth / 2 + xRatio * gridWidth;
+      const pz = bz - gridDepth / 2 + zRatio * gridDepth;
+
+      // Calculate signal strength based on distance from center
+      // Assume RF source is at building center
+      const distFromCenter = Math.sqrt(
+        Math.pow(px - bx, 2) + Math.pow(pz - bz, 2),
+      );
+      const maxDist = Math.sqrt(
+        Math.pow(gridWidth / 2, 2) + Math.pow(gridDepth / 2, 2),
+      );
+
+      // Signal degrades with distance from center
+      const signalQuality = 1 - (distFromCenter / maxDist) * 0.6; // 40-100% quality
+
+      // Add height factor (higher floors may have different characteristics)
+      const heightFactor = floorIndex / floorCount;
+      const combinedQuality =
+        signalQuality * 0.7 + (0.2 + heightFactor * 0.6) * 0.3;
+
+      const metrics = {
+        rssi: generateMetricValue("rssi", combinedQuality),
+        cqi: generateMetricValue("cqi", combinedQuality),
+        rsrp: generateMetricValue("rsrp", combinedQuality),
+        rsrq: generateMetricValue("rsrq", combinedQuality),
+        snr: generateMetricValue("snr", combinedQuality),
+      };
+
+      points.push({
+        id: `${building.id}-indoor-floor${floorIndex}-${xi}-${zi}`,
+        buildingId: building.id,
+        position: [px, floorY, pz],
+        metrics,
+      });
+    }
+  }
+
+  return points;
+}

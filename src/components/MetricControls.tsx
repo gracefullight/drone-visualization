@@ -179,7 +179,7 @@ export function MetricControls(props: MetricControlsProps) {
 
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <div className="h-3 w-8 rounded bg-linear-to-r from-red-500 to-green-500" />
+              <div className="h-3 w-8 rounded bg-linear-to-r from-red-400 to-green-400" />
               <span>Poor → Good Signal</span>
             </div>
           </div>

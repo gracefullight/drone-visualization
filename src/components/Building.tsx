@@ -3,50 +3,120 @@
 import { Edges, Html } from "@react-three/drei";
 import { useTimeout } from "ahooks";
 import { useMemo } from "react";
-import type { BuildingData, RFPoint } from "@/types";
+import * as THREE from "three";
+import { IndoorSignalHeatmap } from "@/components/IndoorSignalHeatmap";
+import { BUILDING_COLORS } from "@/lib/constants/colors";
+import { getColorFromMetric, METRIC_RANGES } from "@/lib/constants/rf-metrics";
+import type { BuildingData, MetricType, RFPoint } from "@/types";
+import { createDeterministicRNG } from "@/utils/prng";
 
 interface BuildingProps {
   building: BuildingData;
   rfPoints: RFPoint[];
+  indoorRFPoints: RFPoint[];
   selectedFloor: number | null;
   onSelectFloor: (floor: number | null) => void;
+  zoomLevel: number;
+  selectedMetric: MetricType;
 }
 
 export function Building({
   building,
   rfPoints,
+  indoorRFPoints,
   selectedFloor,
   onSelectFloor,
+  zoomLevel,
+  selectedMetric,
 }: BuildingProps) {
   const { id, position, width, height, depth, isTarget, floorCount } = building;
 
-  // Deterministic PRNG from id
-  const rng = useMemo(() => {
-    let h = 2166136261 >>> 0;
-    for (let i = 0; i < id.length; i++) {
-      h ^= id.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return () => {
-      h = (h + 0x6d2b79f5) >>> 0;
-      let t = Math.imul(h ^ (h >>> 15), 1 | h);
-      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  // Deterministic random values - generate all at once to ensure consistency
+  const randomValues = useMemo(() => {
+    const rng = createDeterministicRNG(id);
+    return {
+      rotY: (rng() - 0.5) * 0.08, // +/- ~4.5 degrees
+      roughness: 0.65 + rng() * 0.2,
+      metalness: 0.15 + rng() * 0.2,
+      roofWidth: width * (0.28 + rng() * 0.18),
+      roofDepth: depth * (0.25 + rng() * 0.2),
+      roofHeight: Math.max(1, height * (0.05 + rng() * 0.05)),
     };
-  }, [id]);
+  }, [id, width, height, depth]);
 
-  const rotY = useMemo(() => (rng() - 0.5) * 0.08, [rng]); // +/- ~4.5 degrees
-  const baseColor = isTarget ? "#c0c0c0" : "#606060";
-  const roughness = useMemo(() => 0.65 + rng() * 0.2, [rng]);
-  const metalness = useMemo(() => 0.15 + rng() * 0.2, [rng]);
+  const baseColor = isTarget ? BUILDING_COLORS.TARGET_BASE : BUILDING_COLORS.NORMAL_BASE;
 
-  // Rooftop mechanical box
-  const roof = useMemo(() => {
-    const rw = width * (0.28 + rng() * 0.18);
-    const rd = depth * (0.25 + rng() * 0.2);
-    const rh = Math.max(1, height * (0.05 + rng() * 0.05));
-    return { rw, rd, rh };
-  }, [depth, height, rng, width]);
+  // Calculate floor height
+  const floorHeight = height / floorCount;
+
+  // Determine if we should show indoor view based on zoom level
+  // Increased threshold to 0.3 to account for Y-axis 1.5x scaling
+  const showIndoorView = zoomLevel > 0.3;
+  const buildingOpacity = showIndoorView ? 0.15 : (isTarget ? 1 : 0.4);
+
+  // Create wall texture from RF points for exterior visualization
+  const wallTexture = useMemo(() => {
+    if (!isTarget || rfPoints.length === 0 || showIndoorView) return null;
+
+    const resolution = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = resolution;
+    canvas.height = resolution;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, resolution, resolution);
+
+    // Create vertical gradient based on RF points
+    const gridSize = 16;
+    const grid: number[] = Array(gridSize).fill(0);
+    const counts: number[] = Array(gridSize).fill(0);
+
+    for (const point of rfPoints) {
+      const [, py] = point.position;
+      const [, by] = position;
+      const relativeY = py - (by - height / 2);
+      const gridY = Math.floor((relativeY / height) * gridSize);
+
+      if (gridY >= 0 && gridY < gridSize) {
+        // Use selected metric value for coloring
+        const value = point.metrics[selectedMetric];
+        const range = METRIC_RANGES[selectedMetric];
+        const normalizedValue = (value - range.min) / (range.max - range.min);
+        grid[gridY] += Math.max(0, Math.min(1, normalizedValue));
+        counts[gridY]++;
+      }
+    }
+
+    // Draw gradient
+    for (let y = 0; y < gridSize; y++) {
+      if (counts[y] === 0) continue;
+
+      const normalizedValue = grid[y] / counts[y];
+      
+      // Use the same color function as other components
+      const range = METRIC_RANGES[selectedMetric];
+      const value = range.min + normalizedValue * (range.max - range.min);
+      const [r, g, b] = getColorFromMetric(value, selectedMetric);
+
+      const cellHeight = resolution / gridSize;
+      // Flip Y axis: canvas Y goes down, but 3D Y goes up
+      const canvasY = (gridSize - 1 - y) * cellHeight;
+      ctx.fillStyle = `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, 1.0)`;
+      ctx.fillRect(0, canvasY, resolution, cellHeight);
+    }
+
+    // Apply blur
+    ctx.globalAlpha = 1.0;
+    ctx.filter = "blur(3px)";
+    ctx.drawImage(canvas, 0, 0);
+    ctx.filter = "none";
+    ctx.globalAlpha = 1.0;
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }, [isTarget, rfPoints, showIndoorView, position, height, selectedMetric]);
 
   // Auto-close panel after 3 seconds
   useTimeout(
@@ -56,11 +126,62 @@ export function Building({
     selectedFloor !== null ? 3000 : undefined,
   );
 
-  // Calculate floor height
-  const floorHeight = height / floorCount;
-
   return (
-    <group position={position} rotation={[0, rotY, 0]}>
+    <group position={position} rotation={[0, randomValues.rotY, 0]}>
+      {/* Exterior signal visualization overlay */}
+      {wallTexture && !showIndoorView && (
+        <>
+          {/* Front face */}
+          <mesh position={[0, 0, depth / 2 + 0.1]} renderOrder={1}>
+            <planeGeometry args={[width * 0.99, height * 0.99]} />
+            <meshBasicMaterial
+              map={wallTexture}
+              transparent
+              opacity={0.75}
+              depthWrite={false}
+              depthTest={true}
+              side={THREE.FrontSide}
+            />
+          </mesh>
+          {/* Back face */}
+          <mesh position={[0, 0, -depth / 2 - 0.1]} rotation={[0, Math.PI, 0]} renderOrder={1}>
+            <planeGeometry args={[width * 0.99, height * 0.99]} />
+            <meshBasicMaterial
+              map={wallTexture}
+              transparent
+              opacity={0.75}
+              depthWrite={false}
+              depthTest={true}
+              side={THREE.FrontSide}
+            />
+          </mesh>
+          {/* Right face */}
+          <mesh position={[width / 2 + 0.1, 0, 0]} rotation={[0, Math.PI / 2, 0]} renderOrder={1}>
+            <planeGeometry args={[depth * 0.99, height * 0.99]} />
+            <meshBasicMaterial
+              map={wallTexture}
+              transparent
+              opacity={0.75}
+              depthWrite={false}
+              depthTest={true}
+              side={THREE.FrontSide}
+            />
+          </mesh>
+          {/* Left face */}
+          <mesh position={[-width / 2 - 0.1, 0, 0]} rotation={[0, -Math.PI / 2, 0]} renderOrder={1}>
+            <planeGeometry args={[depth * 0.99, height * 0.99]} />
+            <meshBasicMaterial
+              map={wallTexture}
+              transparent
+              opacity={0.75}
+              depthWrite={false}
+              depthTest={true}
+              side={THREE.FrontSide}
+            />
+          </mesh>
+        </>
+      )}
+      
       {[...Array(floorCount)].map((_, i) => {
         const y = -height / 2 + floorHeight * i + floorHeight / 2;
         const key = `floor-${id}-${Math.round(y * 100)}`;
@@ -115,18 +236,46 @@ export function Building({
               <boxGeometry args={[width, floorHeight, depth]} />
               <meshStandardMaterial
                 color={baseColor}
-                transparent={!isTarget}
-                opacity={isTarget ? 1 : 0.4}
-                roughness={roughness}
-                metalness={metalness}
+                transparent
+                opacity={buildingOpacity}
+                roughness={randomValues.roughness}
+                metalness={randomValues.metalness}
               />
             </mesh>
-            {isTarget && (
+            {/* Floor outline when zoomed in */}
+            {showIndoorView && isTarget && (
+              <Edges
+                linewidth={2}
+                scale={1.005}
+                threshold={15}
+                color="#ffffff"
+              />
+            )}
+            {isTarget && !showIndoorView && (
               <Edges
                 linewidth={1.2}
                 scale={1.01}
                 threshold={15}
-                color="#ffff00"
+                color={BUILDING_COLORS.TARGET_OUTLINE}
+              />
+            )}
+            {/* Indoor signal heatmap */}
+            {showIndoorView && isTarget && (
+              <IndoorSignalHeatmap
+                rfPoints={indoorRFPoints.filter((p) => {
+                  const [, by] = position;
+                  const floorMinY = by - height / 2 + floorHeight * i;
+                  const floorMaxY = floorMinY + floorHeight;
+                  const py = p.position[1];
+                  return py >= floorMinY && py < floorMaxY;
+                })}
+                selectedMetric={selectedMetric}
+                buildingWidth={width}
+                buildingDepth={depth}
+                floorY={y}
+                buildingPosition={position}
+                buildingHeight={height}
+                floorCount={floorCount}
               />
             )}
             {selectedFloor === i && (
@@ -176,19 +325,19 @@ export function Building({
         );
       })}
       {/* Rooftop unit */}
-      <group position={[0, height / 2 + roof.rh / 2, 0]}>
+      <group position={[0, height / 2 + randomValues.roofHeight / 2, 0]}>
         <mesh position={[0, 0, 0]}>
-          <boxGeometry args={[roof.rw, roof.rh, roof.rd]} />
+          <boxGeometry args={[randomValues.roofWidth, randomValues.roofHeight, randomValues.roofDepth]} />
           <meshStandardMaterial
-            color={isTarget ? "#a8a8a8" : "#505050"}
+            color={isTarget ? BUILDING_COLORS.TARGET_ROOF : BUILDING_COLORS.NORMAL_ROOF}
             transparent={!isTarget}
             opacity={isTarget ? 1 : 0.45}
-            roughness={Math.min(0.9, roughness + 0.05)}
-            metalness={Math.min(0.4, metalness + 0.1)}
+            roughness={Math.min(0.9, randomValues.roughness + 0.05)}
+            metalness={Math.min(0.4, randomValues.metalness + 0.1)}
           />
         </mesh>
         {isTarget && (
-          <Edges linewidth={1.2} scale={1.01} threshold={15} color="#ffff88" />
+          <Edges linewidth={1.2} scale={1.01} threshold={15} color={BUILDING_COLORS.TARGET_EDGE} />
         )}
       </group>
     </group>

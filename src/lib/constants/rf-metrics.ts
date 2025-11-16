@@ -64,49 +64,21 @@ export function getColorFromMetric(
     Math.min(1, (value - range.min) / (range.max - range.min)),
   );
 
-  // Use HSL color space for smooth gradient: red (0°) -> yellow (60°) -> green (120°)
-  // We'll use 0° to 120° (0 to 0.33 in HSL)
-  const hue = normalized * 0.33; // 0 = red, 0.33 = green in HSL (0-1 scale)
-  const saturation = 1.0;
-  const lightness = 0.5;
+  // Interpolate between red (low) and green (high)
+  // Red: #f87171 (red-400)
+  // Green: #4ade80 (green-400)
+  const redR = 0xf8 / 255;
+  const redG = 0x71 / 255;
+  const redB = 0x71 / 255;
+  
+  const greenR = 0x4a / 255;
+  const greenG = 0xde / 255;
+  const greenB = 0x80 / 255;
 
-  // Convert HSL to RGB
-  return hslToRgb(hue, saturation, lightness);
-}
-
-/**
- * Convert HSL to RGB
- * @param h - Hue (0-1)
- * @param s - Saturation (0-1)
- * @param l - Lightness (0-1)
- * @returns RGB array [r, g, b] with values 0-1
- */
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  let r: number;
-  let g: number;
-  let b: number;
-
-  if (s === 0) {
-    r = l;
-    g = l;
-    b = l;
-  } else {
-    const hue2rgb = (p: number, q: number, t: number): number => {
-      let adjustedT = t;
-      if (adjustedT < 0) adjustedT += 1;
-      if (adjustedT > 1) adjustedT -= 1;
-      if (adjustedT < 1 / 6) return p + (q - p) * 6 * adjustedT;
-      if (adjustedT < 1 / 2) return q;
-      if (adjustedT < 2 / 3) return p + (q - p) * (2 / 3 - adjustedT) * 6;
-      return p;
-    };
-
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1 / 3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1 / 3);
-  }
+  // Linear interpolation in RGB space
+  const r = redR + (greenR - redR) * normalized;
+  const g = redG + (greenG - redG) * normalized;
+  const b = redB + (greenB - redB) * normalized;
 
   return [r, g, b];
 }
