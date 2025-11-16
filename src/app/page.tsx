@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { fetchRFData } from "@/lib/api/rf-data";
 import { MetricControls } from "@/components/MetricControls";
 import { Scene } from "@/components/Scene";
 import type { MetricType, RFDataResponse } from "@/types";
-import { fetchRFData } from "@/lib/api/rf-data";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [data, setData] = useState<RFDataResponse | null>(null);
