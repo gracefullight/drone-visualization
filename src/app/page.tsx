@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { MetricControls } from "@/components/MetricControls";
 import { Scene } from "@/components/Scene";
 import type { MetricType, RFDataResponse } from "@/types";
-import { generateCityLayout } from "@/lib/generators/city-layout";
-import { generateAllRFPoints } from "@/lib/generators/rf-points";
+import { fetchRFData } from "@/lib/api/rf-data";
 
 export default function Home() {
   const [data, setData] = useState<RFDataResponse | null>(null);
@@ -14,16 +13,16 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const buildings = generateCityLayout();
-      const rfPoints = generateAllRFPoints(buildings);
-      setData({ buildings, rfPoints });
-      setLoading(false);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to generate data";
-      setError(msg);
-      setLoading(false);
-    }
+    fetchRFData()
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Failed to load data";
+        setError(msg);
+        setLoading(false);
+      });
   }, []);
 
   if (loading) {
