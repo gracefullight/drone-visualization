@@ -115,6 +115,13 @@ export function Building({
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
+    
+    // Enable mipmapping and better filtering to prevent flickering when zoomed out
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = 16; // Maximum anisotropic filtering for better quality at angles
+    
     return texture;
   }, [isTarget, rfPoints, showIndoorView, position, height, selectedMetric]);
 
@@ -132,50 +139,50 @@ export function Building({
       {wallTexture && !showIndoorView && (
         <>
           {/* Front face */}
-          <mesh position={[0, 0, depth / 2 + 0.1]} renderOrder={1}>
-            <planeGeometry args={[width * 0.99, height * 0.99]} />
+          <mesh position={[0, 0, depth / 2 + 0.5]} renderOrder={2}>
+            <planeGeometry args={[width * 0.98, height * 0.98]} />
             <meshBasicMaterial
               map={wallTexture}
               transparent
               opacity={0.75}
               depthWrite={false}
-              depthTest={true}
+              depthTest={false}
               side={THREE.FrontSide}
             />
           </mesh>
           {/* Back face */}
-          <mesh position={[0, 0, -depth / 2 - 0.1]} rotation={[0, Math.PI, 0]} renderOrder={1}>
-            <planeGeometry args={[width * 0.99, height * 0.99]} />
+          <mesh position={[0, 0, -depth / 2 - 0.5]} rotation={[0, Math.PI, 0]} renderOrder={2}>
+            <planeGeometry args={[width * 0.98, height * 0.98]} />
             <meshBasicMaterial
               map={wallTexture}
               transparent
               opacity={0.75}
               depthWrite={false}
-              depthTest={true}
+              depthTest={false}
               side={THREE.FrontSide}
             />
           </mesh>
           {/* Right face */}
-          <mesh position={[width / 2 + 0.1, 0, 0]} rotation={[0, Math.PI / 2, 0]} renderOrder={1}>
-            <planeGeometry args={[depth * 0.99, height * 0.99]} />
+          <mesh position={[width / 2 + 0.5, 0, 0]} rotation={[0, Math.PI / 2, 0]} renderOrder={2}>
+            <planeGeometry args={[depth * 0.98, height * 0.98]} />
             <meshBasicMaterial
               map={wallTexture}
               transparent
               opacity={0.75}
               depthWrite={false}
-              depthTest={true}
+              depthTest={false}
               side={THREE.FrontSide}
             />
           </mesh>
           {/* Left face */}
-          <mesh position={[-width / 2 - 0.1, 0, 0]} rotation={[0, -Math.PI / 2, 0]} renderOrder={1}>
-            <planeGeometry args={[depth * 0.99, height * 0.99]} />
+          <mesh position={[-width / 2 - 0.5, 0, 0]} rotation={[0, -Math.PI / 2, 0]} renderOrder={2}>
+            <planeGeometry args={[depth * 0.98, height * 0.98]} />
             <meshBasicMaterial
               map={wallTexture}
               transparent
               opacity={0.75}
               depthWrite={false}
-              depthTest={true}
+              depthTest={false}
               side={THREE.FrontSide}
             />
           </mesh>
